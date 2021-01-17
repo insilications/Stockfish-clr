@@ -34,6 +34,8 @@ BINDIR = $(PREFIX)/bin
 
 ### Built-in benchmark for pgo-builds
 PGOBENCH = ./$(EXE) bench
+PGOBENCH2 = ./$(EXE) bench 2096 8 8000 current movetime mixed
+PGOBENCH3 = ./$(EXE) bench 2096 8 8000 default movetime mixed
 
 ### Source and object files
 SRCS = benchmark.cpp bitbase.cpp bitboard.cpp endgame.cpp evaluate.cpp main.cpp \
@@ -510,7 +512,7 @@ endif
 ifeq ($(avx2),yes)
 	CXXFLAGS += -DUSE_AVX2
 	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
-		CXXFLAGS += -mavx2
+		CXXFLAGS += -mavx2 -march=native -mtune=native
 	endif
 endif
 
@@ -600,8 +602,8 @@ ifeq ($(debug), no)
 # GCC on some systems.
 	else ifeq ($(comp),gcc)
 	ifeq ($(gccisclang),)
-		CXXFLAGS += -flto
-		LDFLAGS += $(CXXFLAGS) -flto=jobserver
+		CXXFLAGS += -flto=16
+		LDFLAGS += $(CXXFLAGS) -flto=16
 		ifneq ($(findstring MINGW,$(KERNEL)),)
 			LDFLAGS += -save-temps
 		else ifneq ($(findstring MSYS,$(KERNEL)),)
@@ -618,8 +620,8 @@ ifeq ($(debug), no)
 	else ifeq ($(comp),mingw)
 	ifeq ($(KERNEL),Linux)
 	ifneq ($(arch),i386)
-		CXXFLAGS += -flto
-		LDFLAGS += $(CXXFLAGS) -flto=jobserver
+		CXXFLAGS += -flto=16
+		LDFLAGS += $(CXXFLAGS) -flto=16
 	endif
 	endif
 	endif
@@ -721,6 +723,8 @@ profile-build: net config-sanity objclean profileclean
 	@echo ""
 	@echo "Step 2/4. Running benchmark for pgo-build ..."
 	$(PGOBENCH) > /dev/null
+	$(PGOBENCH2) > /dev/null
+	$(PGOBENCH3) > /dev/null
 	@echo ""
 	@echo "Step 3/4. Building optimized executable ..."
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) objclean
@@ -857,14 +861,14 @@ clang-profile-use:
 
 gcc-profile-make:
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) \
-	EXTRACXXFLAGS='-fprofile-generate' \
-	EXTRALDFLAGS='-lgcov' \
+	EXTRACXXFLAGS='-fprofile-generate=/var/tmp/pgo -fprofile-dir=/var/tmp/pgo -fprofile-abs-path -fprofile-update=atomic -fprofile-arcs -ftest-coverage --coverage -fprofile-partial-training' \
+	EXTRALDFLAGS='-lgcov -fprofile-generate=/var/tmp/pgo -fprofile-dir=/var/tmp/pgo -fprofile-abs-path -fprofile-update=atomic -fprofile-arcs -ftest-coverage --coverage -fprofile-partial-training' \
 	all
 
 gcc-profile-use:
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) \
-	EXTRACXXFLAGS='-fprofile-use -fno-peel-loops -fno-tracer' \
-	EXTRALDFLAGS='-lgcov' \
+	EXTRACXXFLAGS='-fno-peel-loops -fno-tracer -fprofile-use=/var/tmp/pgo -fprofile-dir=/var/tmp/pgo -fprofile-abs-path -fprofile-correction -fprofile-partial-training' \
+	EXTRALDFLAGS='-lgcov -fno-peel-loops -fno-tracer -fprofile-use=/var/tmp/pgo -fprofile-dir=/var/tmp/pgo -fprofile-abs-path -fprofile-correction -fprofile-partial-training' \
 	all
 
 icc-profile-make:
